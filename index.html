@@ -1,0 +1,110 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b1a26"><title>Stockpile</title>
+<style>
+:root{--bg:#0b1a26;--card:#132636;--line:#21394d;--ink:#e8f0f5;--mute:#8ba3b5;--food:#ffb43a;--water:#35d4cf;--pro:#ff6f5e;--fat:#a597ff;--ok:#6fe3a0}
+*{box-sizing:border-box;margin:0}html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font:15px/1.4 Roboto,"Segoe UI",system-ui,sans-serif;padding:env(safe-area-inset-top) 0 calc(64px + env(safe-area-inset-bottom))}
+main{max-width:560px;margin:auto;padding:16px}
+h1{font-size:22px;font-weight:700;letter-spacing:-.3px;margin-bottom:12px}h2{font-size:15px;font-weight:600;margin:18px 0 8px;color:var(--mute)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px;margin-bottom:12px}
+.rings{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.ring{position:relative;text-align:center}.ring svg{width:100%;max-width:150px;transform:rotate(-90deg)}
+.ring b{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:38px;line-height:1;font-weight:800}
+.ring b small{font-size:12px;font-weight:500;color:var(--mute);margin-top:4px}
+.ring p{color:var(--mute);font-size:13px;margin-top:4px}
+.bar{display:flex;height:14px;border-radius:7px;overflow:hidden;background:var(--line)}
+.row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 0;border-top:1px solid var(--line)}.row:first-child{border:0}
+.row small,.mute{color:var(--mute)}.lim{color:var(--pro);font-weight:600}
+button,input{font:inherit;color:inherit}
+button{background:var(--line);border:0;border-radius:12px;padding:10px 14px;cursor:pointer}
+button.pri{background:var(--food);color:#1b1200;font-weight:700}
+input{background:#0b1a26;border:1px solid var(--line);border-radius:12px;padding:10px;width:100%}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px}.seg button.on{background:var(--water);color:#032;font-weight:700}.seg button.on.out{background:var(--pro);color:#2a0600}
+video{width:100%;border-radius:18px;background:#000;aspect-ratio:4/3;object-fit:cover}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:#0f2130;border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;background:none;border-radius:0;padding:14px 4px;color:var(--mute);font-size:13px}nav button.on{color:var(--food);font-weight:700}
+#toast{position:fixed;left:16px;right:16px;bottom:84px;background:#e8f0f5;color:#08131c;padding:12px 14px;border-radius:14px;font-weight:600;opacity:0;pointer-events:none;transition:opacity .2s}
+#toast.show{opacity:1}.q{display:flex;gap:6px;align-items:center}.q button{padding:6px 12px}
+label{display:block;margin:10px 0 4px;color:var(--mute);font-size:13px}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style></head><body><main id="app"></main><div id="toast"></div>
+<nav><button data-v="home">Dashboard</button><button data-v="scan">Scan</button><button data-v="pantry">Pantry</button><button data-v="setup">Household</button></nav>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+// PASTE YOUR FIREBASE CONFIG HERE (Firebase console > Project settings > Your apps > Web app)
+const FIREBASE_CONFIG={apiKey:"AIzaSyDQOaAl6v_T9GeA1G1Jtn7zvkXz2W6rmnQ",authDomain:"stockpile-774a8.firebaseapp.com",projectId:"stockpile-774a8",appId:"1:562244288833:web:78a4890b548fb11bd5e1c0"};
+const $=s=>document.querySelector(s);
+let S={people:2,kcal:2000,water:3.8,waterL:0,items:{}};
+let hid=localStorage.getItem('hid')||'',db,unsubs=[];
+const P=new URLSearchParams(location.search).get('h');
+let view='home',mode='in',stream,timer,last={c:'',t:0};
+const H=()=>db.collection('households').doc(hid),INC=firebase.firestore.FieldValue.increment;
+const f1=n=>(Math.round(n*10)/10).toString();
+function tot(items){const t={k:0,p:0,c:0,f:0};for(const i of Object.values(items)){const m=i.qty*i.g/100;t.k+=m*i.k;t.p+=m*i.p;t.c+=m*i.c;t.f+=m*i.f}return t}
+function need(){const n=S.people,k=S.kcal;return{k:k*n,p:k*.15/4*n,c:k*.5/4*n,f:k*.35/9*n}}
+function days(t){const n=need();return{k:t.k/n.k,p:t.p/n.p,c:t.c/n.c,f:t.f/n.f}}
+const minD=d=>Math.min(d.k,d.p,d.c,d.f);
+const NAMES={k:'Calories',p:'Protein',c:'Carbs',f:'Fat'},COL={k:'var(--food)',p:'var(--pro)',c:'var(--food)',f:'var(--fat)'};
+function ring(v,max,col,label,sub){const r=52,C=2*Math.PI*r,p=Math.min(v/max,1);
+return `<div class="ring"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="${r}" fill="none" stroke="var(--line)" stroke-width="11"/><circle cx="60" cy="60" r="${r}" fill="none" stroke="${col}" stroke-width="11" stroke-linecap="round" stroke-dasharray="${C*p} ${C}"/></svg><b>${f1(v)}<small>${label}</small></b><p>${sub}</p></div>`}
+function recs(){const base=days(tot(S.items)),b=minD(base),out=[];
+for(const [code,i] of Object.entries(S.items)){if(!i.g||!i.k)continue;const it={...S.items,[code]:{...i,qty:i.qty+1}},d=days(tot(it));
+out.push({i,gain:minD(d)-b+.001*(d.k-base.k),k:d.k-base.k})}
+return out.sort((a,b)=>b.gain-a.gain).slice(0,5)}
+function home(){const t=tot(S.items),d=days(t),n=need(),wd=S.waterL/(S.people*S.water);
+const lim=Object.keys(d).reduce((a,k)=>d[k]<d[a]?k:a,'k');
+const kc={p:t.p*4,c:t.c*4,f:t.f*9},ks=kc.p+kc.c+kc.f||1;
+const R=recs();
+return `<h1>Stockpile</h1><div class="card"><div class="rings">${ring(d.k,30,'var(--food)','days','Food · '+Math.round(t.k).toLocaleString()+' kcal')}${ring(wd,30,'var(--water)','days','Water · '+f1(S.waterL)+' L')}</div>
+<p class="mute" style="margin-top:10px;font-size:13px">${S.people} ${S.people==1?'person':'people'} × ${S.kcal} kcal and ${S.water} L per day. Rings fill at 30 days.</p></div>
+<div class="card"><b>Where the calories come from</b><div class="bar" style="margin:10px 0"><i style="width:${kc.p/ks*100}%;background:var(--pro)"></i><i style="width:${kc.c/ks*100}%;background:var(--food)"></i><i style="width:${kc.f/ks*100}%;background:var(--fat)"></i></div>
+<small class="mute">Protein ${Math.round(kc.p/ks*100)}% · Carbs ${Math.round(kc.c/ks*100)}% · Fat ${Math.round(kc.f/ks*100)}% (target 15 / 50 / 35)</small></div>
+<div class="card"><b>Days of supply by nutrient</b>${['k','p','c','f'].map(k=>`<div class="row"><span class="${k==lim&&t.k?'lim':''}">${NAMES[k]}${k==lim&&t.k?' (limits you)':''}<br><small>${Math.round(k=='k'?t.k:t[k])}${k=='k'?' kcal':' g'} of ${Math.round(n[k])}${k=='k'?' kcal':' g'} needed per day</small></span><b style="color:${COL[k]}">${f1(d[k])} d</b></div>`).join('')}</div>
+<div class="card"><b>Buy next</b>${R.length?R.map(r=>`<div class="row"><span>${r.i.name}<br><small>one more adds ${f1(r.k)} days of calories</small></span><b style="color:var(--ok)">+${f1(Math.max(r.gain,0))} d</b></div>`).join(''):'<p class="mute" style="margin-top:6px">Scan a few products first. Recommendations come from products you have scanned before.</p>'}
+${wd<d.k?`<div class="row"><span>Water<br><small>to match your food supply</small></span><b style="color:var(--water)">+${f1((d.k-wd)*S.people*S.water)} L</b></div>`:''}</div>
+<div class="card"><b>Water on hand</b><div class="row"><span>${f1(S.waterL)} L</span><span class="q"><button onclick="w(-1)">−1 L</button><button onclick="w(1)">+1 L</button><button onclick="w(3.8)">+1 gal</button><button onclick="w(19)">+5 gal</button></span></div></div>`}
+function w(x){H().update({waterL:Math.max(0,S.waterL+x)})}
+function scan(){return `<h1>Scan</h1><div class="seg"><button class="${mode=='in'?'on':''}" onclick="setMode('in')">Stock in</button><button class="${mode=='out'?'on out':''}" onclick="setMode('out')">Use up</button></div><video id="v" playsinline muted></video><p class="mute" id="st" style="margin:8px 0">Point at a barcode. Each scan ${mode=='in'?'adds 1 to':'removes 1 from'} your supply.</p><div class="q"><input id="man" inputmode="numeric" placeholder="Type barcode digits"><button class="pri" onclick="handle($('#man').value.trim());$('#man').value=''">Go</button></div>`}
+function setMode(m){mode=m;render()}
+function pantry(){const a=Object.values(S.items).sort((x,y)=>y.qty-x.qty);
+return `<h1>Pantry</h1><div class="card">${a.length?a.map(i=>`<div class="row"><span>${i.name}<br><small>${i.g} g · ${Math.round(i.k)} kcal/100 g · P ${f1(i.p)} C ${f1(i.c)} F ${f1(i.f)}</small></span><span class="q"><button onclick="adj('${i.code}',-1)">−</button><b>${i.qty}</b><button onclick="adj('${i.code}',1)">+</button></span></div>`).join(''):'<p class="mute">Nothing scanned yet. Open Scan and set Stock in.</p>'}</div>`}
+function adj(c,d){const i=S.items[c];if(i.qty+d<0)return;H().collection('items').doc(c).update({qty:INC(d)})}
+function setup(){return `<h1>Household</h1><div class="card"><label>People in the house</label><input type="number" min="1" value="${S.people}" onchange="H().update({people:Math.max(1,+this.value||1)})"><label>Calories per person per day</label><input type="number" value="${S.kcal}" onchange="H().update({kcal:+this.value||2000})"><label>Water per person per day (litres)</label><input type="number" step=".1" value="${S.water}" onchange="H().update({water:+this.value||3.8})"></div><div class="card"><b>Household code</b><p style="font-size:28px;font-weight:800;letter-spacing:3px;margin:6px 0">${hid}</p><div class="q"><button class="pri" onclick="share()">Invite someone</button><button onclick="leave()">Leave household</button></div></div><p class="mute">Targets assume 15% protein, 50% carbs, 35% fat of calories. Everyone in the household sees the same pantry live.</p>`}
+async function lookup(c){let it=null;
+try{const r=await fetch(`https://world.openfoodfacts.org/api/v2/product/${c}.json?fields=product_name,brands,nutriments,product_quantity`),j=await r.json();
+if(j.status==1){const p=j.product,n=p.nutriments||{};it={code:c,name:[(p.brands||'').split(',')[0],p.product_name].filter(Boolean).join(' ')||c,g:+p.product_quantity||0,k:+n['energy-kcal_100g']||0,p:+n.proteins_100g||0,c:+n.carbohydrates_100g||0,f:+n.fat_100g||0,qty:0}}}catch(e){}
+if(!it){const nm=prompt('Not found online. Product name?');if(!nm)return null;it={code:c,name:nm,g:0,k:0,p:0,c:0,f:0,qty:0}}
+if(!it.k){const v=(prompt(`Per 100 g for ${it.name}: calories, protein, carbs, fat (e.g. 360,12,70,3)`)||'').split(',').map(Number);[it.k,it.p,it.c,it.f]=[v[0]||0,v[1]||0,v[2]||0,v[3]||0]}
+if(!it.g)it.g=+prompt(`Package weight in grams for ${it.name}?`)||0;
+return it}
+async function handle(c){if(!c)return;const n=Date.now();if(c===last.c&&n-last.t<2500)return;last={c,t:n};
+let it=S.items[c];const ref=H().collection('items').doc(c);
+if(!it){toast('Looking up '+c+'\u2026');it=await lookup(c);if(!it)return toast('Skipped '+c);await ref.set(it)}
+const d=mode=='in'?1:-1;if(it.qty+d<0)return toast('None on hand: '+it.name);
+ref.update({qty:INC(d)});navigator.vibrate&&navigator.vibrate(60);toast((d>0?'+1 ':'\u22121 ')+it.name+' \u2192 '+(it.qty+d))}
+async function startCam(){const v=$('#v');if(!v)return;
+try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});v.srcObject=stream;await v.play()}catch(e){$('#st').textContent='Camera blocked. Allow camera access, or type the barcode below.';return}
+if(!('BarcodeDetector' in window)){$('#st').textContent='This browser cannot read barcodes. Use Chrome on Android, or type the digits below.';return}
+const det=new BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e']});
+timer=setInterval(async()=>{try{const r=await det.detect(v);if(r[0])handle(r[0].rawValue)}catch(e){}},350)}
+function stopCam(){clearInterval(timer);stream&&stream.getTracks().forEach(t=>t.stop());stream=null}
+let tt;function toast(m){const t=$('#toast');t.textContent=m;t.className='show';clearTimeout(tt);tt=setTimeout(()=>t.className='',2200)}
+function joinView(){return `<h1>Stockpile</h1><div class="card"><b>Join a household</b><label>Household code</label><input id="code" value="${P||''}" autocapitalize="characters" placeholder="e.g. K7M2QX9P"><div class="q" style="margin-top:10px"><button class="pri" onclick="joinH($('#code').value)">Join</button></div></div><div class="card"><b>Start a new household</b><p class="mute" style="margin:6px 0 10px">You get a code to share with the people you live with.</p><button class="pri" onclick="createH()">Create household</button></div>`}
+async function joinH(c){c=(c||'').trim().toUpperCase();if(!c)return;hid=c;const d=await H().get();if(!d.exists){hid='';return toast('No household with that code')}start(c)}
+async function createH(){const A='ABCDEFGHJKMNPQRSTUVWXYZ23456789';let c='';for(let i=0;i<8;i++)c+=A[Math.random()*A.length|0];hid=c;await H().set({people:2,kcal:2000,water:3.8,waterL:0});start(c)}
+function start(c){hid=c;localStorage.setItem('hid',c);unsubs.forEach(u=>u());S.items={};
+unsubs=[H().onSnapshot(d=>{if(d.exists){Object.assign(S,d.data());refresh()}}),H().collection('items').onSnapshot(q=>{S.items={};q.forEach(d=>S.items[d.id]={code:d.id,...d.data()});refresh()})];view='home';render()}
+function leave(){if(!confirm('Leave this household on this phone? Its data stays for the others.'))return;unsubs.forEach(u=>u());localStorage.removeItem('hid');hid='';render()}
+async function share(){const u=location.origin+location.pathname+'?h='+hid,t='Join my Stockpile household. Code: '+hid;try{navigator.share?await navigator.share({title:'Stockpile',text:t,url:u}):(await navigator.clipboard.writeText(t+' '+u),toast('Invite copied'))}catch(e){}}
+function refresh(){if(view!='scan'&&document.activeElement.tagName!='INPUT')render()}
+function render(){stopCam();const nv=$('nav');nv.style.display=hid?'flex':'none';
+$('#app').innerHTML=hid?{home,scan,pantry,setup}[view]():joinView();
+document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v==view));if(hid&&view=='scan')startCam()}
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{view=b.dataset.v;render()});
+if(FIREBASE_CONFIG.apiKey.startsWith('PASTE')){$('#app').innerHTML='<h1>Stockpile</h1><div class="card"><b>Firebase not set up yet</b><p class="mute" style="margin-top:6px">Open this file and paste your Firebase web config into FIREBASE_CONFIG near the top of the script.</p></div>';$('nav').style.display='none'}
+else{firebase.initializeApp(FIREBASE_CONFIG);db=firebase.firestore();db.enablePersistence({synchronizeTabs:true}).catch(()=>{});
+firebase.auth().signInAnonymously().then(()=>hid?start(hid):render()).catch(e=>{$('#app').innerHTML='<div class="card"><b>Sign-in failed</b><p class="mute">'+e.message+'</p></div>'})}
+</script></body></html>
