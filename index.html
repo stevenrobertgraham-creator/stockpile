@@ -5,7 +5,7 @@
 :root{--bg:#0b1a26;--card:#132636;--line:#21394d;--ink:#e8f0f5;--mute:#8ba3b5;--food:#ffb43a;--water:#35d4cf;--pro:#ff6f5e;--fat:#a597ff;--ok:#6fe3a0}
 *{box-sizing:border-box;margin:0}html,body{height:100%}
 body{background:var(--bg);color:var(--ink);font:15px/1.4 Roboto,"Segoe UI",system-ui,sans-serif;padding:env(safe-area-inset-top) 0 calc(64px + env(safe-area-inset-bottom))}
-main{max-width:560px;margin:auto;padding:16px}
+main{max-width:560px;margin:auto;padding:16px 16px 140px}
 h1{font-size:22px;font-weight:700;letter-spacing:-.3px;margin-bottom:12px}h2{font-size:15px;font-weight:600;margin:18px 0 8px;color:var(--mute)}
 .card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px;margin-bottom:12px}
 .rings{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -72,8 +72,18 @@ return `<h1>Stockpile</h1><div class="card"><div class="rings">${ring(d.k,30,'va
 <div class="card"><b>Days of supply by nutrient</b>${['k','p','c','f'].map(k=>`<div class="row"><span class="${k==lim&&t.k?'lim':''}">${NAMES[k]}${k==lim&&t.k?' (limits you)':''}<br><small>${Math.round(k=='k'?t.k:t[k])}${k=='k'?' kcal':' g'} of ${Math.round(n[k])}${k=='k'?' kcal':' g'} needed per day</small></span><b style="color:${COL[k]}">${f1(d[k])} d</b></div>`).join('')}</div>
 ${soon()}<div class="card"><b>Buy next</b>${R.length?R.map(r=>`<div class="row"><span>${r.i.name}<br><small>one more adds ${f1(r.k)} days of calories</small></span><b style="color:var(--ok)">+${f1(Math.max(r.gain,0))} d</b></div>`).join(''):'<p class="mute" style="margin-top:6px">Scan a few products first. Recommendations come from products you have scanned before.</p>'}
 ${wd<d.k?`<div class="row"><span>Water<br><small>to match your food supply</small></span><b style="color:var(--water)">+${f1((d.k-wd)*S.people*S.water)} L</b></div>`:''}</div>
-<div class="card"><b>Water on hand</b><div class="row"><span>${f1(S.waterL)} L</span><span class="q"><button onclick="w(-1)">−1 L</button><button onclick="w(1)">+1 L</button><button onclick="w(3.8)">+1 gal</button><button onclick="w(19)">+5 gal</button></span></div></div>`}
-function w(x){H().update({waterL:Math.max(0,S.waterL+x)})}
+${waterCard()}`}
+function w(x){H().update({waterL:Math.max(0,Math.round((S.waterL+x)*1000)/1000)})}
+function waterCard(){let c;try{c=JSON.parse(localStorage.getItem('wc'))}catch(e){}c=c||{n:1,b:24,m:500};
+return `<div class="card"><b>Water on hand</b><p style="font-size:26px;font-weight:800;margin:6px 0">${f1(S.waterL)} L</p>
+<label>Cases × bottles per case × bottle size</label><div class="q" style="flex-wrap:nowrap"><input id="wn" type="number" min="1" value="${c.n}" style="width:30%"><span>×</span><input id="wb" type="number" min="1" value="${c.b}" style="width:30%"><span>×</span><input id="wm" type="number" min="1" value="${c.m}" style="width:30%"><span>mL</span></div>
+<div class="q" style="margin:8px 0;flex-wrap:wrap"><button onclick="wset(24,500)">24 × 500 mL</button><button onclick="wset(40,500)">40 × 500 mL</button></div>
+<div class="q"><button class="pri" style="flex:1" onclick="wcase(1)">Add cases</button><button style="flex:1" onclick="wcase(-1)">Remove cases</button></div>
+<label>Single bottles (size from the mL box above)</label><div class="q"><button style="flex:1" onclick="wbot(-1)">− 1 bottle</button><button style="flex:1" onclick="wbot(1)">+ 1 bottle</button></div></div>`}
+function wset(b,m){$('#wb').value=b;$('#wm').value=m}
+function wvals(){return{n:Math.max(1,+$('#wn').value||1),b:Math.max(1,+$('#wb').value||1),m:Math.max(1,+$('#wm').value||1)}}
+function wcase(sg){const c=wvals();localStorage.setItem('wc',JSON.stringify(c));const L=sg*c.n*c.b*c.m/1000;w(L);toast((sg>0?'+':'−')+f1(Math.abs(L))+' L water')}
+function wbot(sg){const c=wvals();localStorage.setItem('wc',JSON.stringify(c));w(sg*c.m/1000);toast((sg>0?'+':'−')+c.m+' mL water')}
 function scan(){return `<h1>Scan</h1><div class="seg"><button class="${mode=='in'?'on':''}" onclick="setMode('in')">Stock in</button><button class="${mode=='out'?'on out':''}" onclick="setMode('out')">Use up</button></div><video id="v" playsinline muted></video><p class="mute" id="st" style="margin:8px 0">Point at a barcode. ${mode=='in'?'Each scan asks for the expiry date, then adds to your supply.':'Each scan removes 1, soonest expiry first.'}</p><div class="q"><input id="man" inputmode="numeric" placeholder="Type barcode digits"><button class="pri" onclick="handle($('#man').value.trim());$('#man').value=''">Go</button></div>`}
 function setMode(m){mode=m;render()}
 function soon(){const a=[],lim=inM(2),t=today();for(const i of Object.values(S.items))for(const l of lots(i))if(l.d&&l.d<=lim)a.push({n:i.name,d:l.d,q:l.n});a.sort((x,y)=>x.d<y.d?-1:1);
