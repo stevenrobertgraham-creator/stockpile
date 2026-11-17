@@ -72,8 +72,33 @@ return `<h1>Stockpile</h1><div class="card"><div class="rings">${ring(d.k,30,'va
 <div class="card"><b>Days of supply by nutrient</b>${['k','p','c','f'].map(k=>`<div class="row"><span class="${k==lim&&t.k?'lim':''}">${NAMES[k]}${k==lim&&t.k?' (limits you)':''}<br><small>${Math.round(k=='k'?t.k:t[k])}${k=='k'?' kcal':' g'} of ${Math.round(n[k])}${k=='k'?' kcal':' g'} needed per day</small></span><b style="color:${COL[k]}">${f1(d[k])} d</b></div>`).join('')}</div>
 ${soon()}<div class="card"><b>Buy next</b>${R.length?R.map(r=>`<div class="row"><span>${r.i.name}<br><small>one more adds ${f1(r.k)} days of calories</small></span><b style="color:var(--ok)">+${f1(Math.max(r.gain,0))} d</b></div>`).join(''):'<p class="mute" style="margin-top:6px">Scan a few products first. Recommendations come from products you have scanned before.</p>'}
 ${wd<d.k?`<div class="row"><span>Water<br><small>to match your food supply</small></span><b style="color:var(--water)">+${f1((d.k-wd)*S.people*S.water)} L</b></div>`:''}</div>
-${waterCard()}`}
+${planCard()}${waterCard()}`}
 function w(x){H().update({waterL:Math.max(0,Math.round((S.waterL+x)*1000)/1000)})}
+function planText(){const n=S.people,N=need(),L=[];
+for(const i of Object.values(S.items)){const q=valid(i);if(!q)continue;
+const lt=lots(i).filter(l=>!(l.d&&l.d<today())).map(l=>l.n+(l.d?' (best before '+l.d+')':'')).join(', ');
+L.push(`- ${i.name}: ${q} on hand [${lt}], ${i.g} g each; per 100 g: ${i.k?Math.round(i.k)+' kcal, protein '+f1(i.p)+' g, carbs '+f1(i.c)+' g, fat '+f1(i.f)+' g':'nutrition unknown'}`)}
+if(!L.length)return '';
+const pp=x=>Math.round(x/n);
+return `Plan ONE full day of meals (breakfast, lunch, dinner, and snacks if needed) for ${n} ${n==1?'person':'people'}, using ONLY the food I have on hand listed below, plus water.
+
+Daily targets per person: about ${S.kcal} kcal, ${pp(N.p)} g protein, ${pp(N.c)} g carbs, ${pp(N.f)} g fat.
+Daily targets for the whole household: ${Math.round(N.k)} kcal, ${Math.round(N.p)} g protein, ${Math.round(N.c)} g carbs, ${Math.round(N.f)} g fat.
+
+Rules:
+- Make real, sensible meals that go together, not just a list of items.
+- Do not use more of any item than I have on hand. Use items with the earliest best-before dates first.
+- Give exact amounts (number of packages and grams) for each meal and who it serves.
+- Work out calories, protein, carbs and fat for each meal from the per-100 g values below, show the arithmetic briefly, and give a day total compared with the targets.
+- List anything you would need that is not on my list (salt, oil, spices) separately, and keep it minimal.
+- Add short, simple cooking directions for each meal.
+- If a balanced day is not possible with what I have, say which nutrient falls short and what single items to buy to fix it.
+
+Food on hand:
+${L.join('\n')}`}
+function planCard(){return `<div class="card"><b>One-day meal plan</b><p class="mute" style="margin:6px 0 10px;font-size:13px">Builds a request using only the food you have on hand and your household's targets. Paste it into a Claude chat to get the meals.</p><div class="q" style="flex-wrap:wrap"><button class="pri" onclick="planCopy()">Copy plan request</button><button onclick="planShare()">Share…</button><button onclick="window.open('https://claude.ai/new','_blank')">Open Claude</button></div></div>`}
+async function planCopy(){const t=planText();if(!t)return toast('Scan some food in first');try{await navigator.clipboard.writeText(t);toast('Copied. Paste it into a Claude chat.')}catch(e){toast('Copy failed. Try Share instead.')}}
+async function planShare(){const t=planText();if(!t)return toast('Scan some food in first');try{navigator.share?await navigator.share({title:'Meal plan request',text:t}):(await navigator.clipboard.writeText(t),toast('Copied. Paste it into a Claude chat.'))}catch(e){}}
 function waterCard(){let c;try{c=JSON.parse(localStorage.getItem('wc'))}catch(e){}c=c||{n:1,b:24,m:500};
 return `<div class="card"><b>Water on hand</b><p style="font-size:26px;font-weight:800;margin:6px 0">${f1(S.waterL)} L</p>
 <label>Cases × bottles per case × bottle size</label><div class="q" style="flex-wrap:nowrap"><input id="wn" type="number" min="1" value="${c.n}" style="width:30%"><span>×</span><input id="wb" type="number" min="1" value="${c.b}" style="width:30%"><span>×</span><input id="wm" type="number" min="1" value="${c.m}" style="width:30%"><span>mL</span></div>
