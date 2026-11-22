@@ -27,6 +27,10 @@ nav button{flex:1;background:none;border-radius:0;padding:14px 4px;color:var(--m
 #toast{z-index:20;position:fixed;left:16px;right:16px;bottom:84px;background:#e8f0f5;color:#08131c;padding:12px 14px;border-radius:14px;font-weight:600;opacity:0;pointer-events:none;transition:opacity .2s}
 #toast.show{opacity:1}.q{display:flex;gap:6px;align-items:center}.q button{padding:6px 12px}
 select{background:#0b1a26;border:1px solid var(--line);border-radius:12px;padding:10px;width:100%;color:inherit;font:inherit}
+.guide{position:absolute;left:7%;right:7%;top:30%;bottom:30%;border:2px solid var(--food);border-radius:12px;box-shadow:0 0 0 100vmax rgba(0,0,0,.45);pointer-events:none}
+.guide::after{content:"";position:absolute;left:6px;right:6px;top:12%;height:2px;background:var(--pro);animation:sc 1.6s ease-in-out infinite alternate}
+@keyframes sc{from{top:12%}to{top:88%}}
+@media(prefers-reduced-motion:reduce){.guide::after{animation:none}}
 label{display:block;margin:10px 0 4px;color:var(--mute);font-size:13px}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
 </style></head><body><main id="app"></main><div id="toast"></div>
@@ -117,7 +121,7 @@ function wset(b,m){$('#wb').value=b;$('#wm').value=m}
 function wvals(){return{n:Math.max(1,+$('#wn').value||1),b:Math.max(1,+$('#wb').value||1),m:Math.max(1,+$('#wm').value||1)}}
 function wcase(sg){const c=wvals();localStorage.setItem('wc',JSON.stringify(c));const L=sg*c.n*c.b*c.m/1000;w(L);toast((sg>0?'+':'−')+f1(Math.abs(L))+' L water')}
 function wbot(sg){const c=wvals();localStorage.setItem('wc',JSON.stringify(c));w(sg*c.m/1000);toast((sg>0?'+':'−')+c.m+' mL water')}
-function scan(){return `<h1>Scan</h1><div class="seg"><button class="${mode=='in'?'on':''}" onclick="setMode('in')">Stock in</button><button class="${mode=='out'?'on out':''}" onclick="setMode('out')">Use up</button></div><video id="v" playsinline muted></video><p class="mute" id="st" style="margin:8px 0">Point at a barcode. ${mode=='in'?'Each scan asks for the expiry date, then adds to your supply.':'Each scan removes 1, soonest expiry first.'}</p><div class="q"><input id="man" inputmode="numeric" placeholder="Type barcode digits"><button class="pri" onclick="handle($('#man').value.trim());$('#man').value=''">Go</button></div>`}
+function scan(){return `<h1>Scan</h1><div class="seg"><button class="${mode=='in'?'on':''}" onclick="setMode('in')">Stock in</button><button class="${mode=='out'?'on out':''}" onclick="setMode('out')">Use up</button></div><div style="position:relative;border-radius:18px;overflow:hidden"><video id="v" playsinline muted style="display:block"></video><div class="guide"></div></div><div class="q" id="ctl" style="margin-top:8px;flex-wrap:wrap"></div><p class="mute" id="st" style="margin:8px 0">Center the barcode in the box. ${mode=='in'?'Each scan asks for the expiry date, then adds to your supply.':'Each scan removes 1, soonest expiry first.'}</p><div class="q"><input id="man" inputmode="numeric" placeholder="Type barcode digits"><button class="pri" onclick="handle($('#man').value.trim());$('#man').value=''">Go</button></div>`}
 function setMode(m){mode=m;render()}
 function soon(){const a=[],lim=inM(2),t=today();for(const i of Object.values(S.items))for(const l of lots(i))if(l.d&&l.d<=lim)a.push({n:i.name,d:l.d,q:l.n});a.sort((x,y)=>x.d<y.d?-1:1);
 return `<div class="card"><b>Use soon</b>${a.length?a.slice(0,8).map(r=>`<div class="row"><span>${r.q} × ${r.n}</span><b style="color:${r.d<t?'var(--pro)':'var(--food)'}">${r.d<t?'Expired ':''}${r.d}</b></div>`).join(''):'<p class="mute" style="margin-top:6px">Nothing expires in the next 2 months.</p>'}${a.some(r=>r.d<t)?'<p class="mute" style="margin-top:6px;font-size:13px">Expired items are not counted in your days of supply.</p>':''}</div>`}
@@ -173,11 +177,30 @@ if(!it){toast('Looking up '+c+'\u2026');it=await lookup(c);if(!it)return toast('
 if(mode=='in')return openSheet(c);
 if(total(it)<1)return toast('None on hand: '+it.name);
 useOne(c);navigator.vibrate&&navigator.vibrate(60);toast('\u22121 '+it.name+' \u2192 '+(total(it)-1))}
-async function startCam(){const v=$('#v');if(!v)return;
-try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});v.srcObject=stream;await v.play()}catch(e){$('#st').textContent='Camera blocked. Allow camera access, or type the barcode below.';return}
+let tr=null,cams=[],tOn=false;
+const openStream=id=>{const v={width:{ideal:1920},height:{ideal:1080}};if(id)v.deviceId={exact:id};else v.facingMode={ideal:'environment'};return navigator.mediaDevices.getUserMedia({video:v})};
+async function startCam(){const v=$('#v');if(!v)return;tOn=false;
+try{try{stream=await openStream(localStorage.getItem('cam')||'')}catch(e){stream=await openStream('')}v.srcObject=stream;await v.play()}catch(e){$('#st').textContent='Camera blocked. Allow camera access, or type the barcode below.';return}
+tr=stream.getVideoTracks()[0];
+try{const all=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind=='videoinput'),bk=all.filter(d=>/back|rear|environment/i.test(d.label));cams=bk.length?bk:all}catch(e){cams=[]}
+const cap=(tr.getCapabilities&&tr.getCapabilities())||{};
+try{if(cap.focusMode&&cap.focusMode.includes('continuous'))await tr.applyConstraints({advanced:[{focusMode:'continuous'}]})}catch(e){}
+camCtl(cap);
 if(!('BarcodeDetector' in window)){$('#st').textContent='This browser cannot read barcodes. Use Chrome on Android, or type the digits below.';return}
-const det=new BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e']});
-timer=setInterval(async()=>{try{const r=await det.detect(v);if(r[0])handle(r[0].rawValue)}catch(e){}},350)}
+const det=new BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e']}),cv=document.createElement('canvas'),cx=cv.getContext('2d');
+timer=setInterval(async()=>{if(busy||v.readyState<2||!v.videoWidth)return;try{
+const vw=v.videoWidth,vh=v.videoHeight,k=Math.max(v.clientWidth/vw,v.clientHeight/vh),vis=v.clientWidth/k,vih=v.clientHeight/k;
+const sx=(vw-vis)/2+vis*.07,sy=(vh-vih)/2+vih*.30,sw=Math.round(vis*.86),sh=Math.round(vih*.40);
+cv.width=sw;cv.height=sh;cx.drawImage(v,sx,sy,sw,sh,0,0,sw,sh);
+const r=await det.detect(cv);if(r[0])handle(r[0].rawValue)}catch(e){}},250)}
+function camCtl(cap){const el=$('#ctl');if(!el)return;let h='';
+if(cap.zoom){const z=cap.zoom,sv=Math.min(z.max,Math.max(z.min,+localStorage.getItem('zm')||2));h+=`<span class="mute" style="font-size:13px">Zoom</span><input id="zm" type="range" min="${z.min}" max="${z.max}" step="${z.step||.1}" value="${sv}" style="flex:1;padding:0" oninput="setZoom(this.value)">`;setTimeout(()=>setZoom(sv),0)}
+if(cap.torch)h+='<button id="tb" onclick="torch()">Light</button>';
+if(cams.length>1)h+='<button onclick="nextCam()">Switch camera</button>';
+el.innerHTML=h}
+function setZoom(x){localStorage.setItem('zm',x);tr&&tr.applyConstraints({advanced:[{zoom:+x}]}).catch(()=>{})}
+function torch(){tOn=!tOn;tr.applyConstraints({advanced:[{torch:tOn}]}).catch(()=>{});$('#tb').classList.toggle('pri',tOn)}
+function nextCam(){const cur=tr.getSettings().deviceId,i=cams.findIndex(d=>d.deviceId==cur),n=cams[(i+1)%cams.length];localStorage.setItem('cam',n.deviceId);stopCam();startCam()}
 function stopCam(){clearInterval(timer);stream&&stream.getTracks().forEach(t=>t.stop());stream=null}
 let tt;function toast(m){const t=$('#toast'),sh=!!$('#sheet');t.style.bottom=sh?'auto':'';t.style.top=sh?'calc(12px + env(safe-area-inset-top))':'';t.textContent=m;t.className='show';clearTimeout(tt);tt=setTimeout(()=>t.className='',3000)}
 function joinView(){return `<h1>Stockpile</h1><div class="card"><b>Join a household</b><label>Household code</label><input id="code" value="${P||''}" autocapitalize="characters" placeholder="e.g. K7M2QX9P"><div class="q" style="margin-top:10px"><button class="pri" onclick="joinH($('#code').value)">Join</button></div></div><div class="card"><b>Start a new household</b><p class="mute" style="margin:6px 0 10px">You get a code to share with the people you live with.</p><button class="pri" onclick="createH()">Create household</button></div>`}
