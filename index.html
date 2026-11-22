@@ -57,8 +57,32 @@ const total=i=>lots(i).reduce((a,l)=>a+l.n,0);
 const valid=i=>lots(i).reduce((a,l)=>a+(l.d&&l.d<today()?0:l.n),0);
 const CATS=['Meat, fish & protein','Vegetables','Fruit','Soups & ready meals','Grains, pasta & rice','Beans & legumes','Bread, cereal & crackers','Baking & cooking staples','Spreads, nuts & seeds','Snacks, bars & sweets','Dairy & eggs','Frozen','Drinks','Condiments, sauces & spices','Other'];
 const catOf=i=>CATS.includes(i.cat)?i.cat:'Other';
-const RULES=[['Frozen',/frozen/],['Drinks',/beverage|waters|juices|sodas|coffees|drinks| teas | tea-/],['Condiments, sauces & spices',/sauces|condiments|spices|herbs|ketchup|mustards|mayonnaise|vinegars|seasoning|dressings|salsas|pickles/],['Soups & ready meals',/soups|ready-meals|prepared-meals|instant-noodle|pizzas|dishes|canned-meals/],['Snacks, bars & sweets',/snacks|bars|candies|chocolates|confectioner|biscuits|cookies|chips|crisps|cakes|sweets|pastries|waffles|popcorn|gummies/],['Dairy & eggs',/ (dairies|milks|cheeses|yogurts|eggs|butters|creams|fermented-milk-products) /],['Spreads, nuts & seeds',/nuts|seeds|nut-butter|peanut|spreads|jams|honey|almond/],['Meat, fish & protein',/meat|fish|seafood|tuna|sausage|poultry|chicken|beef|pork| hams? |tofu|salmon|sardine|jerky|bacon/],['Beans & legumes',/legume|beans|lentils|chickpeas| peas /],['Baking & cooking staples',/flour|sugars|oils|salt|baking|yeast|margarine|shortening|syrup|starch|fats/],['Grains, pasta & rice',/pastas|rices|noodles|couscous|quinoa|grains|spaghetti|macaroni/],['Bread, cereal & crackers',/ (breads|breakfast-cereals|crackers|tortillas|bagels|mueslis?|granolas?|oatmeals?|oat-flakes|rolled-oats|pancakes) /],['Fruit',/ (fruits|fruits-based-foods|canned-fruits|dried-fruits|fruit-preserves|apples|bananas|berries|peaches|pears|pineapples|oranges) /],['Vegetables',/ (vegetables|vegetables-based-foods|canned-vegetables|potatoes|tomatoes|onions|carrots|corn|mushrooms|sweet-corn) /]];
-function guessCat(tags){const t=' '+(tags||[]).map(x=>x.replace(/^[a-z]{2,3}:/,'')).join(' ')+' ';for(const [c,re] of RULES)if(re.test(t))return c;return 'Other'}
+const W=w=>new RegExp('(^|-)('+w+')(-|$)');
+const RULES=[
+['Other',6,W('baby|infants?|formula|supplements?|vitamins?|weight-control|meal-replacements?|specialty')],
+['Frozen',5,/^frozen|-frozen|surgel|(^|-)(ice-creams?|sorbets?)(-|$)/],
+['Spreads, nuts & seeds',3,/(peanut|nut|almond|cashew|seed|hazelnut|chocolate|cocoa)-(butters?|spreads?)/],
+['Drinks',3,W('plant-based-milks?|oat-milks?|almond-milks?|soy-milks?|plant-based-beverages|dairy-substitutes?')],
+['Condiments, sauces & spices',3,W('sauces?|condiments?|ketchups?|mustards?|mayonnaises?|vinegars?|dressings?|salsas?|pickles?|relishes|spices?|herbs?|seasonings?|marinades?|salts?|vinaigres?|epices?')],
+['Soups & ready meals',3,W('soups?|soupes?|meals?|dishes|pizzas?|pies|quiches|sandwiches|lasagnes?|ravioli|chilis?|stews?|ramen|burritos?|instant-noodles')],
+['Drinks',3,W('beverages?|drinks?|juices?|nectars?|sodas?|colas?|waters?|coffees?|teas?|infusions?|wines?|beers?|spirits|liquors?|alcohol|alcoholic|boissons?|jus|eau|cafes?')],
+['Snacks, bars & sweets',3,W('bars?|chocolates?|candies|candy|confectioner(y|ies)|gummies|cookies?|brownies|muffins?|cakes?|popcorns?|crisps|sweet-snacks|salty-snacks|cocoa-and-its-products|bonbons|gateaux')],
+['Grains, pasta & rice',1,W('cereals-and-potatoes|cereals-and-their-products')],
+['Bread, cereal & crackers',3,W('breads?|crackers?|tortillas?|bagels?|breakfast-cereals|cereals?|mueslis?|granolas?|oats?|oatmeals?|pancakes?|pains?|cereales')],
+['Dairy & eggs',3,W('dairies|dairy|milks?|cheeses?|yogurts?|yoghurts?|eggs?|butters?|creams?|kefirs?|fromages?|laits?|yaourts?|oeufs?')],
+['Snacks, bars & sweets',3,W('snacks?|biscuits?|sweets|desserts?|pastries|waffles|gaufres')],
+['Spreads, nuts & seeds',3,W('spreads?|jams?|marmalades?|honeys?|bee-products|nuts?|seeds?|almonds?|peanuts?|cashews?|walnuts?|hazelnuts?|pistachios?|confitures?|noix|miel')],
+['Meat, fish & protein',3,W('meats?|poultr(y|ies)|chickens?|turkeys?|beef|pork|hams?|sausages?|bacons?|salamis?|jerkys?|fish(es)?|seafoods?|tunas?|salmons?|sardines?|shrimps?|prawns?|crabs?|tofu|tempeh|meat-analogues|meat-alternatives|viandes?|poissons?|thons?|saucissons?|jambons?|cold-cuts|deli-meats|prepared-meats|meats-and-their-products|fishes-and-their-products|chicken-and-its-products|pork-and-its-products')],
+['Beans & legumes',3,W('legumes?|pulses|beans?|lentils?|chickpeas?|peas|hummus|haricots?|lentilles|pois|legumineuses|legumes-and-their-products')],
+['Baking & cooking staples',3,W('flours?|sugars?|sweeteners?|oils?|fats?|vegetable-fats|vegetable-oils|baking|yeasts?|margarines?|shortenings?|syrups?|starch(es)?|molasses|farines?|sucres?|huiles?|lards?')],
+['Grains, pasta & rice',3,W('pastas?|rices?|noodles?|couscous|quinoa|grains?|cereal-grains|spaghettis?|macaronis?|pates|riz|nouilles|semoules?')],
+['Vegetables',3,W('vegetables?|vegetables-based-foods|vegetable-based-foods|potatoes|potatos?|tomatoes|tomato|onions?|carrots?|corn|sweet-corn|mushrooms?|spinach|broccoli|cabbages?|peppers?|salads?')],
+['Fruit',3,W('fruits?|fruits-based-foods|fruit-based-foods|dried-fruits|canned-fruits|apples?|bananas?|berr(y|ies)|strawberr(y|ies)|oranges?|lemons?|peaches|pears?|pineapples?|grapes?|raisins|fruit-preserves|compotes?|applesauces?|citrus')]];
+const STOP=new Set('plant-based-foods-and-beverages plant-based-foods groceries foods food undefined fermented-foods dried-products canned-foods canned-plant-based-foods farming-products non-food-products fresh-foods dried-plant-based-foods fruits-and-vegetables-based-foods fruits-and-vegetables fruit-and-vegetable-preserves vegetable-based-foods-and-beverages'.split(' '));
+function score(list){const sc={};for(let t of list){t=String(t||'').toLowerCase().replace(/^[a-z]{2,3}:/,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');if(!t||STOP.has(t))continue;
+const i=RULES.findIndex(r=>r[2].test(t));if(i<0)continue;const r=RULES[i];sc[r[0]]=sc[r[0]]||{s:0,i};sc[r[0]].s+=r[1]}return sc}
+function best(sc){let b=null;for(const [c,v] of Object.entries(sc))if(!b||v.s>b.s||(v.s==b.s&&v.i<b.i))b={c,s:v.s,i:v.i};return b}
+function guessCat(tags,name){let b=best(score(tags||[]));if((!b||b.s<3)&&name){const w=String(name).toLowerCase().split(/[^a-z]+/).filter(Boolean),n=best(score([...w,...w.slice(1).map((x,i)=>w[i]+'-'+x).filter(p=>/^(peanut|almond|cashew|hazelnut|sunflower|nut|seed)-(butter|spread)$|^ice-cream$/.test(p))]));if(n&&(!b||n.s>b.s))b=n}return b?b.c:'Other'}
 const pref=()=>{try{return{sort:'az',cat:true,...JSON.parse(localStorage.getItem('ps'))}}catch(e){return{sort:'az',cat:true}}};
 function setPref(k){const o=pref();if(k=='sort')o.sort=o.sort=='az'?'exp':'az';else o.cat=!o.cat;localStorage.setItem('ps',JSON.stringify(o));render()}
 let busy=false,lastD=localStorage.getItem('lastd')||'';
@@ -125,14 +149,22 @@ function scan(){return `<h1>Scan</h1><div class="seg"><button class="${mode=='in
 function setMode(m){mode=m;render()}
 function soon(){const a=[],lim=inM(2),t=today();for(const i of Object.values(S.items))for(const l of lots(i))if(l.d&&l.d<=lim)a.push({n:i.name,d:l.d,q:l.n});a.sort((x,y)=>x.d<y.d?-1:1);
 return `<div class="card"><b>Use soon</b>${a.length?a.slice(0,8).map(r=>`<div class="row"><span>${r.q} × ${r.n}</span><b style="color:${r.d<t?'var(--pro)':'var(--food)'}">${r.d<t?'Expired ':''}${r.d}</b></div>`).join(''):'<p class="mute" style="margin-top:6px">Nothing expires in the next 2 months.</p>'}${a.some(r=>r.d<t)?'<p class="mute" style="margin-top:6px;font-size:13px">Expired items are not counted in your days of supply.</p>':''}</div>`}
+async function fixCats(){const a=Object.values(S.items).filter(i=>catOf(i)=='Other');if(!a.length)return toast('Nothing to categorize');let n=0,k=0;
+for(const i of a){toast(`Categorizing ${++k} of ${a.length}\u2026`);let c='Other';
+try{const r=await fetch(`https://world.openfoodfacts.org/api/v2/product/${i.code}.json?fields=product_name,categories_tags`),j=await r.json();if(j.status==1)c=guessCat(j.product.categories_tags,j.product.product_name||i.name)}catch(e){}
+if(c=='Other'){const u=await usda(i.code);if(u)c=u.cat}
+if(c=='Other')c=guessCat([],i.name);
+if(c!='Other'){await H().collection('items').doc(i.code).update({cat:c});n++}}
+toast(`Categorized ${n} of ${a.length}`)}
 function row(i){return `<div class="row" style="align-items:flex-start"><span>${i.name}<br><small>${i.k&&i.g?i.g+' g · '+Math.round(i.k)+' kcal/100 g':'<span class="lim">No nutrition info. Tap Edit.</span>'}</small>${lots(i).map(l=>`<br><small class="${l.d&&l.d<today()?'lim':''}">${l.n} × ${l.d||'no date'}${l.d&&l.d<today()?' (expired)':''} <a href="#" onclick="event.preventDefault();adjLot('${i.code}','${l.d}',-1)" style="color:var(--pro)">remove 1</a></small>`).join('')}</span><span class="q" style="flex-direction:column;align-items:stretch"><button onclick="openSheet('${i.code}')">+ Add</button><button onclick="editItem('${i.code}')">Edit</button></span></div>`}
 function pantry(){const o=pref(),a=Object.values(S.items);
 const key=i=>lots(i).filter(l=>l.d&&l.n>0).map(l=>l.d).sort()[0]||'~';
 a.sort(o.sort=='exp'?(x,y)=>key(x)<key(y)?-1:key(x)>key(y)?1:x.name.localeCompare(y.name):(x,y)=>x.name.localeCompare(y.name));
 const bar=`<div class="seg"><button class="on" onclick="setPref('sort')">Sort: ${o.sort=='exp'?'Soonest expiry':'A–Z'}</button><button class="${o.cat?'on':''}" onclick="setPref('cat')">Categories: ${o.cat?'On':'Off'}</button></div>`;
+const fx=a.some(i=>catOf(i)=='Other')?'<button onclick="fixCats()" style="width:100%;margin-bottom:10px">Auto-categorize items in Other</button>':'';
 if(!a.length)return `<h1>Pantry</h1>${bar}<div class="card"><p class="mute">Nothing scanned yet. Open Scan and set Stock in.</p></div>`;
-if(!o.cat)return `<h1>Pantry</h1>${bar}<div class="card">${a.map(row).join('')}</div>`;
-return `<h1>Pantry</h1>${bar}`+CATS.map(c=>{const g=a.filter(i=>catOf(i)==c);return g.length?`<h2>${c} (${g.length})</h2><div class="card">${g.map(row).join('')}</div>`:''}).join('')}
+if(!o.cat)return `<h1>Pantry</h1>${bar}${fx}<div class="card">${a.map(row).join('')}</div>`;
+return `<h1>Pantry</h1>${bar}${fx}`+CATS.map(c=>{const g=a.filter(i=>catOf(i)==c);return g.length?`<h2>${c} (${g.length})</h2><div class="card">${g.map(row).join('')}</div>`:''}).join('')}
 function edit(c,fn){const x=S.items[c],l=fn(lots(x).map(o=>({...o}))).filter(o=>o.n>0);return H().collection('items').doc(c).update({lots:l,qty:l.reduce((a,o)=>a+o.n,0)})}
 const addLot=(c,d,n)=>edit(c,l=>{const o=l.find(x=>x.d==d);o?o.n+=n:l.push({d,n});return l});
 const adjLot=(c,d,n)=>edit(c,l=>{const o=l.find(x=>x.d==d);if(o)o.n+=n;return l});
@@ -148,7 +180,7 @@ function editOk(c){const v=id=>$('#'+id).value;H().collection('items').doc(c).up
 function editDel(c){if(!confirm('Delete '+S.items[c].name+' and all its stock? This removes it for everyone in the household.'))return;H().collection('items').doc(c).delete();toast('Deleted');sheetX()}
 async function editLook(c){toast('Looking up\u2026');const set=(id,v)=>{if(v)$('#'+id).value=v};let got=false;
 try{const r=await fetch(`https://world.openfoodfacts.org/api/v2/product/${c}.json?fields=product_name,brands,nutriments,product_quantity,quantity,categories_tags`),j=await r.json();
-if(j.status==1){const p=j.product,n=p.nutriments||{};if(+n['energy-kcal_100g']){got=true;const g=guessCat(p.categories_tags);if(g!='Other')$('#ecat').value=g;set('en',[(p.brands||'').split(',')[0],p.product_name].filter(Boolean).join(' '));set('eg',+p.product_quantity||parseQty(p.quantity));set('ek',+n['energy-kcal_100g']);set('ep',+n.proteins_100g);set('ec',+n.carbohydrates_100g);set('ef',+n.fat_100g)}}}catch(e){}
+if(j.status==1){const p=j.product,n=p.nutriments||{};if(+n['energy-kcal_100g']){got=true;const g=guessCat(p.categories_tags,p.product_name);if(g!='Other')$('#ecat').value=g;set('en',[(p.brands||'').split(',')[0],p.product_name].filter(Boolean).join(' '));set('eg',+p.product_quantity||parseQty(p.quantity));set('ek',+n['energy-kcal_100g']);set('ep',+n.proteins_100g);set('ec',+n.carbohydrates_100g);set('ef',+n.fat_100g)}}}catch(e){}
 if(!got){toast('Checking USDA database\u2026');const u=await usda(c);if(u){got=true;if(u.cat!='Other')$('#ecat').value=u.cat;set('en',u.name);set('eg',u.g);set('ek',u.k);set('ep',u.p);set('ec',u.c);set('ef',u.f)}}
 toast(got?'Filled in. Check the numbers, then tap Save.':'Not found in either database. Enter the numbers by hand.')}
 function sheetOk(c){const d=$('#ed').value,n=Math.max(1,+$('#eq').value||1);lastD=d;localStorage.setItem('lastd',d);addLot(c,d,n);navigator.vibrate&&navigator.vibrate(60);toast('+'+n+' '+S.items[c].name);sheetX()}
@@ -169,11 +201,11 @@ const f=(j.foods||[]).find(x=>(x.gtinUpc||'').replace(/^0+/,'')==c.replace(/^0+/
 const nv=id=>{const o=(f.foodNutrients||[]).find(n=>n.nutrientId==id);return o?+o.value||0:0};
 const g=parseQty(f.packageWeight);
 const slug=(f.foodCategory||'').toLowerCase().replace(/[^a-z]+/g,'-');
-return{name:T([(f.brandName||f.brandOwner||'').trim(),f.description].filter(Boolean).join(' ')),g,k:nv(1008),p:nv(1003),c:nv(1005),f:nv(1004),cat:guessCat([slug,...slug.split('-')])}}}catch(e){}
+return{name:T([(f.brandName||f.brandOwner||'').trim(),f.description].filter(Boolean).join(' ')),g,k:nv(1008),p:nv(1003),c:nv(1005),f:nv(1004),cat:guessCat([f.foodCategory||'',...(f.foodCategory||'').split(/[^A-Za-z]+/)],f.description)}}}catch(e){}
 return null}
 async function lookup(c){let it=null;
 try{const r=await fetch(`https://world.openfoodfacts.org/api/v2/product/${c}.json?fields=product_name,brands,nutriments,product_quantity,quantity,categories_tags`),j=await r.json();
-if(j.status==1){const p=j.product,n=p.nutriments||{};it={code:c,name:[(p.brands||'').split(',')[0],p.product_name].filter(Boolean).join(' ')||c,g:+p.product_quantity||parseQty(p.quantity),k:+n['energy-kcal_100g']||0,p:+n.proteins_100g||0,c:+n.carbohydrates_100g||0,f:+n.fat_100g||0,qty:0,cat:guessCat(p.categories_tags)}}}catch(e){}
+if(j.status==1){const p=j.product,n=p.nutriments||{};it={code:c,name:[(p.brands||'').split(',')[0],p.product_name].filter(Boolean).join(' ')||c,g:+p.product_quantity||parseQty(p.quantity),k:+n['energy-kcal_100g']||0,p:+n.proteins_100g||0,c:+n.carbohydrates_100g||0,f:+n.fat_100g||0,qty:0,cat:guessCat(p.categories_tags,p.product_name)}}}catch(e){}
 if(!it||!it.k||!it.g){toast('Checking USDA database\u2026');const u=await usda(c);if(u){if(!it)it={code:c,qty:0,...u};else{if(!it.k){it.k=u.k;it.p=u.p;it.c=u.c;it.f=u.f}if(!it.g)it.g=u.g;if(it.cat=='Other')it.cat=u.cat}}}
 if(!it){const nm=await ask('Not found online','Product name','text');if(!nm)return null;it={code:c,name:nm,g:0,k:0,p:0,c:0,f:0,qty:0,cat:'Other'}}
 if(!it.k){const v=(await ask('Nutrition for '+it.name,'Per 100 g: calories, protein, carbs, fat (e.g. 360,12,70,3)','text')||'').split(',').map(Number);[it.k,it.p,it.c,it.f]=[v[0]||0,v[1]||0,v[2]||0,v[3]||0]}
